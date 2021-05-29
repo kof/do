@@ -3,15 +3,12 @@
 function Do() {}
 
 const chain = function (fn, ...args) {
-  const current = (done) => {
-    if (done) current.done = done;
+  const current = (done, next) => {
     if (current.prev) {
-      current.prev.next = current;
-      current.prev();
+      current.prev(done, (data) => current.forward(done, next, data));
     } else {
-      current.forward();
+      current.forward(done, next);
     }
-    return current;
   };
 
   const prev = this instanceof Do ? this : null;
@@ -25,16 +22,20 @@ Do.prototype.do = function (fn, ...args) {
   return chain.call(this, fn, ...args);
 };
 
-Do.prototype.forward = function () {
-  if (this.fn)
-    this.fn(...this.args, (err, data) => {
-      const next = this.next;
-      if (next) {
-        if (next.fn) next.forward();
-      } else if (this.done) {
-        this.done(err, data);
-      }
-    });
+Do.prototype.forward = function (done, next, rest = []) {
+  if (!this.fn) return;
+  const args = [...this.args, ...rest];
+  this.fn(...args, (err, ...data) => {
+    if (err) {
+      done(err);
+      return;
+    }
+    if (next) {
+      next(data);
+    } else {
+      done(null, ...data);
+    }
+  });
 };
 
 function Collector() {}
